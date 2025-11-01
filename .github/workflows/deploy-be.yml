@@ -1,0 +1,36 @@
+name: Deploy Backend to Self-Hosted Server
+
+on:
+  push:
+    branches:
+      - main  # uruchamia się po puszu do maina
+
+jobs:
+  deploy:
+    name: Deploy BE to Ubuntu (self-hosted)
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build project
+        run: npm run build
+
+      - name: Set environment variables
+        run: |
+          echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> $GITHUB_ENV
+
+      - name: Restart backend with PM2
+        run: |
+          pm2 stop uip-be || true
+          pm2 delete uip-be || true
+          pm2 start "npm start" --name "uip-be"
