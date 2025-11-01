@@ -1,0 +1,41 @@
+{
+  "models": {
+    "CLAUDE_FAST": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "temperature": 0.7,
+      "maxTokens": 4096,
+      "description": "Fast and efficient for most tasks"
+    },
+    "CLAUDE_SMART": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-20250514",
+      "temperature": 0.3,
+      "maxTokens": 8192,
+      "description": "Most capable for complex reasoning"
+    },
+    "GPT_FAST": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "temperature": 0.7,
+      "maxTokens": 4096,
+      "description": "Cost-effective OpenAI model"
+    },
+    "GPT_SMART": {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "temperature": 0.5,
+      "maxTokens": 8192,
+      "description": "Most capable OpenAI model"
+    },
+    "GPT_VISION": {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "temperature": 0.7,
+      "maxTokens": 4096,
+      "description": "For image analysis tasks"
+    }
+  },
+  "default": "CLAUDE_FAST",
+  "fallback": "GPT_FAST"
+}

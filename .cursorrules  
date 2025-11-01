@@ -1,0 +1,537 @@
+# Universal Input Processor - Cursor Rules
+
+> These rules guide AI assistants (Cursor, Copilot, etc.) in implementing the Universal Input Processor project.
+
+---
+
+## 🎯 Project Context
+
+**Architecture:** Fastify-based API with AI orchestration  
+**Key Endpoint:** POST /v1/process (single universal endpoint)  
+**Tech Stack:** Fastify, TypeScript, Anthropic Claude, OpenAI GPT  
+**Pattern:** Plugin-based tools with LLM-powered intent detection  
+**Processing:** Synchronous (max 60s timeout), stateless, in-memory only
+
+**Core Principles:**
+- Single endpoint accepts any input (text, files, URLs)
+- LLM analyzes intent and plans tool execution
+- Pipeline executes tools sequentially (fail fast)
+- Returns structured response with human-readable message
+
+---
+
+## 📁 Project Structure Reference
+
+```
+src/
+├── core/
+│   ├── gateway/              # Main API endpoint
+│   ├── intent/               # LLM-based planning
+│   ├── orchestrator/         # Pipeline execution
+│   └── llm/                  # LLM abstraction (Anthropic/OpenAI)
+├── tools/                    # Plugin-based tools (auto-discovery)
+├── common/
+│   ├── types/                # All TypeScript interfaces
+│   ├── utils/                # Helpers
+│   └── constants/            # App constants
+└── plugins/                  # Fastify plugins
+```
+
+**Key Files to Reference:**
+- `docs/ARCHITECTURE.md` - Complete system design
+- `src/common/types/index.ts` - All TypeScript types
+- `config/llm-models.json` - LLM model configurations
+
+---
+
+## 🎨 TypeScript Guidelines
+
+### Strict Typing (Critical)
+```typescript
+// ✅ ALWAYS use explicit types
+interface User {
+  id: string;
+  name: string;
+}
+
+const getUser = async (id: string): Promise<User> => {
+  // Implementation
+};
+
+// ❌ NEVER use 'any'
+const data: any = {}; // FORBIDDEN
+
+// ✅ Use 'unknown' with type guards
+const data: unknown = {};
+if (typeof data === 'object' && data !== null) {
+  // Safe to use
+}
+```
+
+### Path Aliases (Always Use)
+```typescript
+// ✅ Use path aliases
+import { ILLMClient } from '@core/llm/llm-client.interface';
+import { ITool } from '@tools/tool.interface';
+import { ProcessingError } from '@common/types/errors';
+
+// ❌ Never use relative imports across directories
+import { ILLMClient } from '../../core/llm/llm-client.interface'; // NO
+```
+
+### Const Assertions
+```typescript
+// ✅ Use const assertions for constants
+export const TOOL_TYPES = {
+  PDF: 'pdf-extraction',
+  IMAGE: 'image-analysis',
+  SEARCH: 'web-search'
+} as const;
+```
+
+---
+
+## 📏 File Naming & Organization
+
+### File Names (Strict)
+```
+✅ service files:      example-name.service.ts
+✅ controller files:   example-name.controller.ts
+✅ interface files:    example-name.interface.ts
+✅ type files:         example-name.types.ts
+✅ util files:         example-name.utils.ts
+✅ test files:         example-name.spec.ts
+
+❌ NEVER:             ExampleName.ts, example_name.ts, exampleName.ts
+```
+
+### Import Order (Enforced)
+```typescript
+// 1. Node.js built-ins
+import { readFile } from 'fs/promises';
+import path from 'path';
+
+// 2. External dependencies
+import Fastify from 'fastify';
+import Anthropic from '@anthropic-ai/sdk';
+
+// 3. Internal - path aliases
+import { ILLMClient } from '@core/llm/llm-client.interface';
+import { ITool } from '@tools/tool.interface';
+import { ProcessingError } from '@common/types/errors';
+
+// 4. Relative imports (same directory only)
+import { helperFunction } from './utils';
+```
+
+---
+
+## 🛠️ Tool Implementation Pattern (Critical)
+
+**Every tool MUST follow this exact structure:**
+
+### Folder Structure
+```
+src/tools/[tool-name]/
+├── index.ts              # Export point
+├── tool.config.json      # Metadata
+└── handler.ts            # Implementation
+```
+
+### tool.config.json Template
+```json
+{
+  "name": "tool-name",
+  "version": "1.0.0",
+  "description": "What this tool does",
+  "capabilities": ["capability1", "capability2"],
+  "inputTypes": ["application/pdf", "text/plain"],
+  "outputType": "structured-data",
+  "estimatedDurationMs": 2000,
+  "priority": 10
+}
+```
+
+### index.ts Template
+```typescript
+import config from './tool.config.json';
+import { execute } from './handler';
+import type { ITool } from '@tools/tool.interface';
+
+const tool: ITool = {
+  config,
+  execute
+};
+
+export default tool;
+```
+
+### handler.ts Template
+```typescript
+import type { IToolContext, IToolResult } from '@tools/tool.interface';
+
+export async function execute(context: IToolContext): Promise<IToolResult> {
+  try {
+    const startTime = Date.now();
+    
+    // Tool logic here
+    const output = await processInput(context);
+    
+    return {
+      success: true,
+      output,
+      metadata: {
+        processingTimeMs: Date.now() - startTime
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      output: null,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+// Helper function (example)
+async function processInput(context: IToolContext): Promise<unknown> {
+  // Implementation
+}
+```
+
+---
+
+## 🚨 Critical Rules (Must Follow)
+
+### MUST DO
+1. ✅ Use types from `src/common/types/index.ts`
+2. ✅ Import via path aliases (@core, @tools, @common)
+3. ✅ Validate inputs with Zod where needed
+4. ✅ Use custom error types (ProcessingError, ToolExecutionError, etc.)
+5. ✅ Add JSDoc comments to exported functions
+6. ✅ Log with context (requestId, step, tool name)
+7. ✅ Clean up resources (buffers, file handles)
+8. ✅ Fail fast - first error stops pipeline
+
+### NEVER DO
+1. ❌ Never use 'any' type
+2. ❌ Never store files on disk (in-memory only)
+3. ❌ Never commit .env file
+4. ❌ Never swallow errors silently
+5. ❌ Never use synchronous operations
+6. ❌ Never hardcode secrets
+7. ❌ Never mutate input parameters
+8. ❌ Never use console.log in production (use logger)
+
+---
+
+## 🔧 Service Class Pattern
+
+```typescript
+// ✅ Standard service pattern
+export class ExampleService {
+  private readonly dependency: OtherService;
+
+  constructor(dependency: OtherService) {
+    this.dependency = dependency;
+  }
+
+  async doSomething(input: string): Promise<Result> {
+    try {
+      const result = await this.dependency.process(input);
+      return result;
+    } catch (error) {
+      throw new ProcessingError(
+        'Something failed',
+        'ERROR_CODE',
+        undefined,
+        error
+      );
+    }
+  }
+}
+```
+
+---
+
+## ⚠️ Error Handling Pattern (Critical)
+
+```typescript
+// ✅ Always use custom error types
+throw new ToolExecutionError('pdf-extraction', 'Invalid PDF structure');
+
+// ✅ Catch and transform unknown errors
+try {
+  await tool.execute(context);
+} catch (error) {
+  if (error instanceof ToolExecutionError) {
+    throw error; // Re-throw custom errors
+  }
+  throw new ToolExecutionError(
+    tool.config.name,
+    error instanceof Error ? error.message : 'Unknown error'
+  );
+}
+
+// ✅ Tools NEVER throw - return error in result
+export async function execute(context: IToolContext): Promise<IToolResult> {
+  try {
+    // Logic
+    return { success: true, output };
+  } catch (error) {
+    return {
+      success: false,
+      output: null,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+```
+
+---
+
+## 📝 Code Comments Guidelines
+
+```typescript
+// ✅ JSDoc for public APIs
+/**
+ * Executes pipeline of tools based on execution plan.
+ * 
+ * @param context - Pipeline execution context with request and plan
+ * @returns Pipeline result with all step outputs and timing
+ * @throws {PipelineError} When pipeline execution fails
+ */
+export async function executePipeline(
+  context: PipelineContext
+): Promise<PipelineResult> {
+  // Implementation
+}
+
+// ✅ Inline comments for complex logic
+// Use 60s timeout to accommodate slow LLM API responses
+const timeout = 60000;
+
+// ❌ Don't state the obvious
+const x = 5; // Set x to 5 - NO!
+```
+
+---
+
+## 🎯 LLM Configuration Pattern
+
+### Config Alias Resolution
+```typescript
+// User sends: "llm_config": "CLAUDE_FAST"
+// System resolves from config/llm-models.json:
+{
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-20250514",
+  "temperature": 0.7,
+  "maxTokens": 4096
+}
+
+// Factory creates appropriate client
+const client = LLMFactory.create('CLAUDE_FAST');
+// Returns: AnthropicClient or OpenAIClient (implements ILLMClient)
+```
+
+---
+
+## 🔄 Pipeline Execution Flow
+
+```
+1. Request arrives at Gateway
+   ↓
+2. Validate input (instruction required, file < 10MB)
+   ↓
+3. Create LLM client from config alias
+   ↓
+4. Intent Detection (LLM analyzes instruction + file metadata)
+   ↓
+5. Planning (LLM returns array of tools to execute)
+   ↓
+6. Tool Loading (from registry, validate they exist)
+   ↓
+7. Pipeline Execution (sequential, fail fast)
+   - Tool 1 → output
+   - Tool 2 (uses output from Tool 1) → output
+   - Tool 3 (uses output from Tool 2) → final result
+   ↓
+8. Response Formatting (human message + structured data)
+   ↓
+9. Return to client
+```
+
+---
+
+## 🧪 Testing Guidelines
+
+```typescript
+// ✅ Arrange-Act-Assert pattern
+describe('LLMFactory', () => {
+  it('should create Anthropic client for CLAUDE_FAST', () => {
+    // Arrange
+    const alias = 'CLAUDE_FAST';
+    
+    // Act
+    const client = LLMFactory.create(alias);
+    
+    // Assert
+    expect(client).toBeInstanceOf(AnthropicClient);
+    expect(client.getProvider()).toBe('anthropic');
+  });
+});
+
+// ✅ Mock external dependencies
+const mockLLMClient: ILLMClient = {
+  complete: vi.fn().mockResolvedValue({
+    content: 'test response',
+    usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 }
+  }),
+  getProvider: () => 'anthropic',
+  getModelName: () => 'claude-test'
+};
+```
+
+---
+
+## 📊 Performance Considerations
+
+- Keep tool execution under 10s when possible
+- Log execution time per tool
+- Monitor token usage for LLM calls
+- Clean up buffers after processing
+- 60s hard timeout per request
+
+---
+
+## 🔐 Security Checklist
+
+- [ ] API keys from .env ONLY (never hardcoded)
+- [ ] Validate file size (max 10MB)
+- [ ] Validate MIME types
+- [ ] Sanitize user instructions before LLM calls
+- [ ] Never execute user code without sandboxing
+- [ ] Rate limiting in production
+
+---
+
+## 🤖 AI Assistant Directives
+
+### When Creating Services
+Create TypeScript service class with:
+- Dependency injection via constructor
+- Proper error handling with custom types
+- JSDoc comments for public methods
+- Strict typing (no 'any')
+- Imports via path aliases
+
+### When Creating Tools
+Follow the exact tool pattern:
+- Folder: `src/tools/[tool-name]/`
+- Files: index.ts, tool.config.json, handler.ts
+- Implement ITool interface
+- Never throw from execute() - return error in result
+- Use IToolContext and IToolResult types
+
+### When Handling Errors
+- Use custom error types from `@common/types/errors`
+- Include context (tool name, step, details)
+- Log errors with full context
+- Fail fast in pipeline
+- Never swallow errors
+
+### When Writing Tests
+- Use Vitest
+- Mock external dependencies
+- Arrange-Act-Assert pattern
+- Test happy path and error cases
+- Descriptive test names
+
+---
+
+## 📚 Reference Quick Links
+
+**Architecture:** `docs/ARCHITECTURE.md`  
+**Types:** `src/common/types/index.ts`  
+**LLM Config:** `config/llm-models.json`  
+**App Config:** `config/app.config.json`  
+**Example Tool:** `src/tools/simple-ask/`
+
+---
+
+## 🎓 Common Patterns
+
+### Loading Configuration
+```typescript
+import llmModels from '@config/llm-models.json';
+const modelConfig = llmModels.models[alias];
+```
+
+### Using LLM Client
+```typescript
+const client = LLMFactory.create(llmConfigAlias);
+const response = await client.complete([
+  { role: 'user', content: instruction }
+]);
+```
+
+### Tool Registry
+```typescript
+const tool = registry.get('pdf-extraction');
+const result = await tool.execute(context);
+if (!result.success) {
+  throw new ToolExecutionError(tool.config.name, result.error);
+}
+```
+
+### Pipeline Execution
+```typescript
+let previousOutput: unknown = undefined;
+for (const step of plan.steps) {
+  const tool = registry.get(step.tool);
+  const result = await tool.execute({
+    ...context,
+    previousResult: previousOutput
+  });
+  if (!result.success) {
+    throw new PipelineError(`Step ${step.tool} failed`);
+  }
+  previousOutput = result.output;
+}
+```
+
+---
+
+## ⚡ Quick Commands
+
+```bash
+# Development
+npm run dev              # Start with hot reload
+npm run build            # Compile TypeScript
+npm start                # Production server
+
+# Testing
+npm test                 # Run all tests
+npm run test:unit        # Unit tests only
+
+# Code Quality
+npm run lint             # ESLint
+npm run format           # Prettier
+```
+
+---
+
+## 🚀 Implementation Priority
+
+1. **Phase 1:** Server + LLM abstraction + Tool registry
+2. **Phase 2:** Simple ASK tool (first working flow)
+3. **Phase 3:** Intent detection + Pipeline executor + Gateway
+4. **Phase 4:** Additional tools (PDF, Image, Web)
+5. **Phase 5:** Testing + Polish
+
+---
+
+**Version:** 1.0.0  
+**Last Updated:** 2025-10-01  
+**Project:** Universal Input Processor

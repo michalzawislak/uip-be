@@ -1,0 +1,18 @@
+{
+  "name": "image-analysis",
+  "version": "1.0.0",
+  "description": "Analyze images using AI vision (OCR, description, medical scans)",
+  "capabilities": ["vision", "ocr", "image-description", "medical-imaging", "handwriting-recognition"],
+  "inputTypes": ["image/jpeg", "image/png", "image/webp", "image/gif"],
+  "outputType": "text",
+  "estimatedDurationMs": 25000,
+  "priority": 85,
+  "contentType": {
+    "contentType": "image/analysis-v1",
+    "version": "1.0.0",
+    "category": "vision",
+    "defaultDisplayType": "card",
+    "icon": "🔍"
+  }
+}
+

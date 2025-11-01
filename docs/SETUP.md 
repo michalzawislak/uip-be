@@ -1,0 +1,307 @@
+# 🚀 Getting Started - Step by Step Guide
+
+## 📋 Prerequisites
+
+**Install these first:**
+
+1. **Node.js** (v18 or higher)
+   ```bash
+   node --version  # Should be >= 18.0.0
+   ```
+   Download: https://nodejs.org/
+
+2. **Git**
+   ```bash
+   git --version
+   ```
+   Download: https://git-scm.com/
+
+3. **Code Editor** (VS Code or Cursor recommended)
+   - VS Code: https://code.visualstudio.com/
+   - Cursor: https://cursor.sh/
+
+4. **AI Assistant** (choose one):
+   - **Cursor** (recommended)
+   - **GitHub Copilot**
+   - **Claude Code** (CLI)
+   - **Cline** (VS Code extension)
+
+5. **API Keys**:
+   - Anthropic: https://console.anthropic.com/
+   - OpenAI: https://platform.openai.com/api-keys
+
+---
+
+## 🎬 Step 1: Create Project Directory
+
+```bash
+# Create project folder
+mkdir universal-input-processor
+cd universal-input-processor
+
+# Initialize Git
+git init
+
+# Create initial README
+echo "# Universal Input Processor" > README.md
+```
+
+---
+
+## 📁 Step 2: Create Folder Structure
+
+```bash
+# Create all directories
+mkdir -p src/{core/{gateway/{dto},intent,orchestrator,llm/{providers}},tools/{simple-ask,pdf-extraction,image-analysis,web-search},common/{types,utils,constants},plugins}
+
+mkdir -p config
+mkdir -p docs
+mkdir -p tests/{unit,integration,fixtures}
+```
+
+**Verify:**
+```bash
+tree -L 3 -d  # On macOS/Linux
+# Or check manually in file explorer
+```
+
+---
+
+## 📝 Step 3: Copy Configuration Files
+
+**From artifacts, copy these files:**
+
+### Root Level:
+```
+.env.example
+.gitignore
+.prettierrc
+.eslintrc.json
+package.json
+tsconfig.json
+vitest.config.ts
+README.md
+.cursorrules (if using Cursor)
+```
+
+### Config:
+```
+config/llm-models.json
+config/app.config.json
+```
+
+### Documentation:
+```
+docs/ARCHITECTURE.md
+docs/AI-CONTEXT.md
+docs/SETUP.md (this file)
+```
+
+### Types:
+```
+src/common/types/index.ts
+```
+
+---
+
+## 🔧 Step 4: Setup Environment Variables
+
+```bash
+# Copy example to actual .env
+cp .env.example .env
+
+# Edit .env
+nano .env  # or use your editor
+```
+
+**Add your API keys:**
+```bash
+ANTHROPIC_API_KEY=sk-ant-api03-YOUR_KEY
+OPENAI_API_KEY=sk-proj-YOUR_KEY
+```
+
+---
+
+## 📦 Step 5: Install Dependencies
+
+```bash
+# Install packages
+npm install
+```
+
+**If errors:**
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+---
+
+## 🎨 Step 6: Setup AI Assistant
+
+### **Cursor:**
+Create `.cursorrules` in project root (already done if copied)
+
+### **GitHub Copilot:**
+```bash
+mkdir -p .github
+# Copy AI-CONTEXT.md content to:
+# .github/copilot-instructions.md
+```
+
+### **Claude Code / Cline:**
+Just reference `docs/AI-CONTEXT.md` in prompts
+
+---
+
+## 🧪 Step 7: Verify Setup
+
+```bash
+# Check TypeScript
+npx tsc --version
+
+# Try to compile (will fail - no code yet, but shows TS works)
+npm run build
+```
+
+---
+
+## 🎯 Step 8: First Code - Health Check
+
+**Create `src/server.ts`:**
+
+```typescript
+import Fastify from 'fastify';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
+const fastify = Fastify({
+  logger: true,
+  requestTimeout: 60000
+});
+
+fastify.get('/health', async () => {
+  return {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  };
+});
+
+const start = async () => {
+  try {
+    const port = parseInt(process.env.PORT || '3000');
+    await fastify.listen({ port, host: '0.0.0.0' });
+    console.log(`🚀 Server on http://localhost:${port}`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
+```
+
+---
+
+## ✅ Step 9: Test Setup
+
+```bash
+# Start server
+npm run dev
+
+# In another terminal:
+curl http://localhost:3000/health
+```
+
+**Expected:** `{"status":"healthy",...}`
+
+**If it works:** 🎉 **Setup Complete!**
+
+---
+
+## 🤖 Step 10: Start with AI
+
+### **First Prompt:**
+
+```
+Cześć! Pracuję nad Universal Input Processor.
+
+Przeczytaj:
+1. docs/ARCHITECTURE.md
+2. docs/AI-CONTEXT.md
+3. src/common/types/index.ts
+
+Podsumuj główne komponenty i zaproponuj kolejność implementacji.
+```
+
+### **Next Steps:**
+1. LLM abstraction layer
+2. Tool registry
+3. Simple ASK tool
+4. Intent detection
+5. Pipeline executor
+6. Gateway controller
+
+---
+
+## 📚 Reference
+
+**Keep open while coding:**
+- `docs/ARCHITECTURE.md` - System design
+- `docs/AI-CONTEXT.md` - Coding patterns
+- `src/common/types/index.ts` - All types
+
+---
+
+## 🐛 Troubleshooting
+
+### Port in use:
+```bash
+PORT=3001 npm run dev
+```
+
+### TypeScript errors:
+```bash
+rm -rf dist node_modules
+npm install
+npm run build
+```
+
+### API key issues:
+```bash
+echo $ANTHROPIC_API_KEY
+echo $OPENAI_API_KEY
+```
+
+---
+
+## 📊 Checklist
+
+After setup:
+
+- [ ] Folders created
+- [ ] Config files copied
+- [ ] Dependencies installed
+- [ ] .env with API keys
+- [ ] Health check works
+- [ ] AI context configured
+
+---
+
+## 🎯 Next: Implementation
+
+Follow **Phase 1-8** from `docs/ARCHITECTURE.md` Section 8.
+
+**Start with:**
+1. Basic server ✅ (done)
+2. LLM abstraction
+3. Tool system
+4. First tool (simple-ask)
+
+---
+
+**Setup Time:** 30-45 minutes  
+**Ready to code!** 🚀
+

@@ -1,0 +1,19 @@
+{
+  "name": "pdf-extraction",
+  "version": "1.1.0",
+  "description": "Extract text from PDF documents and analyze content using AI",
+  "capabilities": ["pdf", "document", "text-extraction", "document-analysis", "medical-documents", "invoice-analysis"],
+  "inputTypes": ["application/pdf"],
+  "outputType": "analyzed-document",
+  "estimatedDurationMs": 5000,
+  "priority": 90,
+  "contentType": {
+    "contentType": "document/analyzed-v1",
+    "version": "1.1.0",
+    "category": "document",
+    "defaultDisplayType": "text",
+    "icon": "📄",
+    "primaryField": "analysis"
+  }
+}
+

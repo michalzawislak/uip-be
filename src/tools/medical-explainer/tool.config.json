@@ -1,0 +1,18 @@
+{
+  "name": "medical-explainer",
+  "version": "1.0.0",
+  "description": "Translate medical documents and lab results into plain language",
+  "capabilities": ["medical", "health", "lab-results", "document-translation", "patient-education"],
+  "inputTypes": ["text/plain", "structured-data"],
+  "outputType": "explanation",
+  "estimatedDurationMs": 20000,
+  "priority": 70,
+  "contentType": {
+    "contentType": "medical/explanation-v1",
+    "version": "1.0.0",
+    "category": "health",
+    "defaultDisplayType": "card",
+    "icon": "⚕️"
+  }
+}
+

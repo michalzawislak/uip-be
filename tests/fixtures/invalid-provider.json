@@ -1,0 +1,1 @@
+{"models":{"CLAUDE_FAST":{"provider":"invalid","model":"claude-sonnet-4-20250514","temperature":0.7,"maxTokens":4096,"description":"Fast Claude model"},"GPT_FAST":{"provider":"openai","model":"gpt-4o-mini","temperature":0.7,"maxTokens":4096,"description":"Fast GPT model"}},"default":"CLAUDE_FAST","fallback":"GPT_FAST"}

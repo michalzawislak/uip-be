@@ -1,0 +1,19 @@
+{
+  "name": "nutrition-analyzer",
+  "version": "1.0.0",
+  "description": "Analyze nutritional values of products and meals using Open Food Facts API and LLM reasoning",
+  "capabilities": ["nutrition", "calories", "macros", "food-composition", "product-search", "polish-products", "barcode", "barcode-scanning"],
+  "inputTypes": ["text/plain", "structured-data", "image/jpeg", "image/png"],
+  "outputType": "nutrition-data",
+  "estimatedDurationMs": 5000,
+  "priority": 90,
+  "contentType": {
+    "contentType": "nutrition/data-v1",
+    "version": "1.0.0",
+    "category": "health",
+    "defaultDisplayType": "card",
+    "primaryField": "productName",
+    "icon": "🥗"
+  }
+}
+

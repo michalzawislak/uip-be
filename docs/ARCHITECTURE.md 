@@ -1,0 +1,657 @@
+**Location:** `universal-input-processor/docs/ARCHITECTURE.md`
+
+```markdown
+# Universal Input Processor - Architecture Documentation
+
+## 1. Architecture Decision Record (ADR)
+
+### ADR-001: Technology Stack
+**Decision:** Fastify + TypeScript  
+**Rationale:** Performance (50k req/s), plugin architecture, TypeScript native, low memory footprint  
+**Status:** Accepted
+
+### ADR-002: Synchronous Processing Model
+**Decision:** Standard HTTP request/response (max 60s timeout)  
+**Rationale:** Simplicity, no job tracking needed, zero storage requirement  
+**Alternatives Considered:** Async with Bull/Redis (rejected - too complex for MVP)  
+**Status:** Accepted
+
+### ADR-003: Stateless Architecture
+**Decision:** Zero backend storage, everything in-memory during request lifecycle  
+**Rationale:** Simplicity, no database needed, easier deployment  
+**Implications:** No history, no resume capability, files must be small (<10MB)  
+**Status:** Accepted
+
+### ADR-004: LLM-Based Intent Detection & Planning
+**Decision:** Always use LLM for intent detection and pipeline planning  
+**Rationale:** Maximum flexibility, handles complex user instructions  
+**Trade-off:** Higher cost per request, dependent on external API  
+**Status:** Accepted
+
+### ADR-005: Multi-Provider LLM Support
+**Decision:** Support both Anthropic (Claude) and OpenAI (GPT) with config aliases  
+**Example:** `"llm_config": "CLAUDE_FAST"` maps to specific model  
+**Rationale:** Flexibility, cost optimization, fallback capability  
+**Status:** Accepted
+
+### ADR-006: Plugin-Based Tool System
+**Decision:** Auto-discovery from tools/ folder with folder convention  
+**Rationale:** Easy to add new tools, clean separation of concerns  
+**Status:** Accepted
+
+### ADR-007: Tool Chaining
+**Decision:** Support sequential pipeline execution (Tool A → B → C)  
+**Rationale:** Complex tasks require multi-step processing  
+**Status:** Accepted
+
+### ADR-008: Fail Fast Error Handling
+**Decision:** First error terminates entire pipeline  
+**Rationale:** Simplicity, clear error reporting  
+**Alternatives Considered:** Partial results, retry logic (deferred to future)  
+**Status:** Accepted
+
+### ADR-009: File Upload Limits
+**Decision:** Max 10MB, all MIME types accepted, 1 file per request  
+**Rationale:** Memory constraints, simplicity  
+**Status:** Accepted
+
+### ADR-010: Deployment Target
+**Decision:** Self-hosted (local/VM), Firecracker T8 on Proxmox  
+**Rationale:** Full control, no cloud costs  
+**Status:** Accepted
+
+---
+
+## 2. System Architecture Diagram
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    CLIENT / BOT / INTEGRATION               │
+└─────────────────────┬──────────────────────────────────────┘
+                      │
+                      │ POST /v1/process
+                      │ { instruction, file?, llm_config }
+                      │
+┌─────────────────────▼──────────────────────────────────────┐
+│                  FASTIFY GATEWAY LAYER                      │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ - Request validation (max 10MB)                      │  │
+│  │ - Multipart parsing (file upload)                    │  │
+│  │ - Timeout handler (60s)                              │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────┬──────────────────────────────────────┘
+                      │
+┌─────────────────────▼──────────────────────────────────────┐
+│              INTENT DETECTION & PLANNING LAYER              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ LLM Abstraction (Anthropic/OpenAI)                   │  │
+│  │ ↓                                                     │  │
+│  │ Content Analysis:                                     │  │
+│  │  - MIME type detection                                │  │
+│  │  - File structure analysis                            │  │
+│  │  - User instruction parsing                           │  │
+│  │ ↓                                                     │  │
+│  │ Pipeline Planning:                                    │  │
+│  │  - Select tools                                       │  │
+│  │  - Order execution                                    │  │
+│  │  - Generate execution plan                            │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────┬──────────────────────────────────────┘
+                      │
+                      │ ExecutionPlan[]
+                      │
+┌─────────────────────▼──────────────────────────────────────┐
+│                PIPELINE ORCHESTRATION LAYER                 │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ Sequential Executor                                   │  │
+│  │  - Load tool from registry                            │  │
+│  │  - Execute tool.execute()                             │  │
+│  │  - Pass output to next tool                           │  │
+│  │  - Handle errors (fail fast)                          │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────┬──────────────────────────────────────┘
+                      │
+        ┌─────────────┼─────────────┐
+        │             │             │
+┌───────▼──────┐ ┌────▼─────┐ ┌────▼─────────┐
+│ TOOL LAYER   │ │ TOOL     │ │ TOOL         │
+│              │ │ LAYER    │ │ LAYER        │
+│ pdf-extract  │ │ image-   │ │ web-search   │
+│              │ │ analysis │ │              │
+│ ┌──────────┐ │ │┌────────┐│ │┌────────────┐│
+│ │execute() │ │ ││execute││ ││execute()   ││
+│ └──────────┘ │ │└────────┘│ │└────────────┘│
+└──────────────┘ └──────────┘ └──────────────┘
+        │             │             │
+        └─────────────┼─────────────┘
+                      │
+┌─────────────────────▼──────────────────────────────────────┐
+│                  RESPONSE FORMATTER LAYER                   │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ - Structure results                                   │  │
+│  │ - Generate human-readable message                     │  │
+│  │ - Add metadata (execution time, tools used)           │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────┬──────────────────────────────────────┘
+                      │
+                      │ JSON Response
+                      │
+┌─────────────────────▼──────────────────────────────────────┐
+│                          CLIENT                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. API Contract
+
+### 3.1 Process Endpoint
+
+**Request:**
+```http
+POST /v1/process
+Content-Type: multipart/form-data
+```
+
+**Body Parameters:**
+```typescript
+{
+  instruction: string;           // REQUIRED: "Wyciągnij kwoty z tego PDF"
+  file?: File;                   // OPTIONAL: uploaded file (max 10MB)
+  llm_config?: string;           // OPTIONAL: "CLAUDE_FAST" | "GPT_SMART" | ...
+                                 // DEFAULT: "CLAUDE_FAST"
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Znaleziono 3 kwoty: 100.50 PLN, 250.00 PLN, 1500.99 PLN",
+  "result": {
+    "extracted_amounts": [100.50, 250.00, 1500.99],
+    "currency": "PLN"
+  },
+  "metadata": {
+    "execution_time_ms": 4523,
+    "tools_used": ["pdf-extraction", "data-extraction"],
+    "llm_model": "CLAUDE_FAST",
+    "plan_generated": true
+  }
+}
+```
+
+**Error Response (400/500):**
+```json
+{
+  "success": false,
+  "error": "PDF extraction failed: Invalid PDF structure",
+  "failed_at_step": 1,
+  "completed_steps": ["intent-detection"],
+  "metadata": {
+    "execution_time_ms": 1234,
+    "llm_model": "CLAUDE_FAST"
+  }
+}
+```
+
+### 3.2 Health Check
+
+**Request:**
+```http
+GET /health
+```
+
+**Response (200):**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-10-01T12:00:00Z",
+  "version": "1.0.0"
+}
+```
+
+### 3.3 Available Tools
+
+**Request:**
+```http
+GET /v1/tools
+```
+
+**Response (200):**
+```json
+{
+  "tools": [
+    {
+      "name": "pdf-extraction",
+      "description": "Extract text and data from PDF files",
+      "capabilities": ["pdf", "document", "text-extraction"]
+    },
+    {
+      "name": "image-analysis",
+      "description": "Analyze images using AI vision models",
+      "capabilities": ["image", "ocr", "object-detection"]
+    }
+  ]
+}
+```
+
+---
+
+## 4. Tool Interface Specification
+
+### 4.1 Folder Structure
+
+```
+tools/
+├── pdf-extraction/
+│   ├── index.ts
+│   ├── tool.config.json
+│   └── handler.ts
+│
+├── image-analysis/
+│   ├── index.ts
+│   ├── tool.config.json
+│   └── handler.ts
+│
+└── simple-ask/
+    ├── index.ts
+    ├── tool.config.json
+    └── handler.ts
+```
+
+### 4.2 Tool Config Schema
+
+**tool.config.json:**
+```json
+{
+  "name": "pdf-extraction",
+  "version": "1.0.0",
+  "description": "Extract text and structured data from PDF files",
+  "capabilities": ["pdf", "document", "text-extraction"],
+  "inputTypes": ["application/pdf"],
+  "outputType": "text",
+  "estimatedDurationMs": 2000,
+  "priority": 10
+}
+```
+
+### 4.3 Tool Interface (TypeScript)
+
+**index.ts:**
+```typescript
+export interface IToolConfig {
+  name: string;
+  version: string;
+  description: string;
+  capabilities: string[];
+  inputTypes: string[];
+  outputType: string;
+  estimatedDurationMs: number;
+  priority: number;
+}
+
+export interface IToolContext {
+  instruction: string;
+  file?: {
+    buffer: Buffer;
+    mimetype: string;
+    originalname: string;
+    size: number;
+  };
+  previousResult?: unknown;
+  llmClient: ILLMClient;
+  metadata?: Record<string, unknown>;
+}
+
+export interface IToolResult {
+  success: boolean;
+  output: unknown;
+  metadata?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface ITool {
+  config: IToolConfig;
+  execute(context: IToolContext): Promise<IToolResult>;
+}
+```
+
+---
+
+## 5. LLM Abstraction Design
+
+### 5.1 Config File Structure
+
+**config/llm-models.json:**
+```json
+{
+  "models": {
+    "CLAUDE_FAST": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "temperature": 0.7,
+      "maxTokens": 4096
+    },
+    "CLAUDE_SMART": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-20250514",
+      "temperature": 0.3,
+      "maxTokens": 8192
+    },
+    "GPT_FAST": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "temperature": 0.7,
+      "maxTokens": 4096
+    },
+    "GPT_SMART": {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "temperature": 0.5,
+      "maxTokens": 8192
+    }
+  },
+  "default": "CLAUDE_FAST"
+}
+```
+
+### 5.2 LLM Client Interface
+
+```typescript
+export interface LLMConfig {
+  provider: 'anthropic' | 'openai';
+  model: string;
+  temperature: number;
+  maxTokens: number;
+}
+
+export interface LLMMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface LLMResponse {
+  content: string;
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+  model: string;
+}
+
+export interface ILLMClient {
+  complete(messages: LLMMessage[]): Promise<LLMResponse>;
+}
+```
+
+---
+
+## 6. Execution Flow
+
+### 6.1 Request Processing Flow
+
+```
+1. REQUEST ARRIVES
+   ↓
+2. VALIDATE INPUT
+   - Check file size (<10MB)
+   - Parse multipart form
+   - Validate instruction exists
+   ↓
+3. LOAD LLM CONFIG
+   - Get llm_config alias (default: CLAUDE_FAST)
+   - Load from config/llm-models.json
+   - Create LLM client
+   ↓
+4. ANALYZE INTENT
+   - Send to LLM: instruction + file metadata
+   - LLM returns: detected intent + execution plan
+   ↓
+5. LOAD TOOLS
+   - For each tool in plan:
+     - Load from registry
+     - Verify tool exists
+   ↓
+6. EXECUTE PIPELINE
+   - For each tool in sequence:
+     a. Call tool.execute(context)
+     b. If success: pass output to next
+     c. If fail: STOP and return error
+   ↓
+7. FORMAT RESPONSE
+   - Generate human-readable message
+   - Structure result data
+   - Add metadata
+   ↓
+8. RETURN RESPONSE
+```
+
+### 6.2 LLM Planning Prompt Template
+
+```
+You are a task planning system. Analyze the user's instruction and available tools, 
+then create an execution plan.
+
+USER INSTRUCTION: "{instruction}"
+FILE PROVIDED: {filename} ({mimetype}, {size} bytes)
+AVAILABLE TOOLS: {toolsList}
+
+Return a JSON array of steps:
+[
+  {
+    "tool": "tool-name",
+    "reason": "why this tool"
+  },
+  ...
+]
+
+Keep the plan simple and high-level. Tools will handle their own parameters.
+```
+
+---
+
+## 7. Project Structure
+
+```
+universal-input-processor/
+├── src/
+│   ├── core/
+│   │   ├── gateway/
+│   │   │   ├── gateway.controller.ts
+│   │   │   ├── gateway.service.ts
+│   │   │   └── dto/
+│   │   ├── intent/
+│   │   │   ├── intent-detector.service.ts
+│   │   │   ├── planner.service.ts
+│   │   │   └── types.ts
+│   │   ├── orchestrator/
+│   │   │   ├── pipeline-executor.service.ts
+│   │   │   ├── tool-loader.service.ts
+│   │   │   └── types.ts
+│   │   └── llm/
+│   │       ├── llm-factory.service.ts
+│   │       ├── llm-client.interface.ts
+│   │       ├── config-loader.service.ts
+│   │       └── providers/
+│   ├── tools/
+│   │   ├── registry.service.ts
+│   │   ├── tool.interface.ts
+│   │   ├── simple-ask/
+│   │   ├── pdf-extraction/
+│   │   ├── image-analysis/
+│   │   └── web-search/
+│   ├── common/
+│   │   ├── types/
+│   │   ├── utils/
+│   │   └── constants/
+│   ├── plugins/
+│   └── app.ts
+│   └── server.ts
+│
+├── config/
+│   ├── llm-models.json
+│   └── app.config.json
+│
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── fixtures/
+│
+├── .env.example
+├── .gitignore
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+---
+
+## 8. Implementation Checklist
+
+### Phase 1: Project Setup (Day 1)
+- [ ] Initialize Node.js project
+- [ ] Install dependencies
+- [ ] Setup TypeScript
+- [ ] Create folder structure
+- [ ] Setup .env file
+- [ ] Create config files
+
+### Phase 2: Core Infrastructure (Days 2-3)
+- [ ] **Fastify server setup**
+  - [ ] Basic server.ts
+  - [ ] Health check endpoint
+  - [ ] Error handling
+  - [ ] 60s timeout configuration
+  
+- [ ] **LLM Abstraction Layer**
+  - [ ] LLM interface definition
+  - [ ] Config loader service
+  - [ ] Anthropic client
+  - [ ] OpenAI client
+  - [ ] Factory pattern
+
+### Phase 3: Plugin System (Days 4-5)
+- [ ] **Tool Registry**
+  - [ ] Tool interface
+  - [ ] Auto-discovery
+  - [ ] Config validation
+  - [ ] Registry service
+
+- [ ] **First Tool: Simple ASK**
+  - [ ] Create tools/simple-ask/
+  - [ ] Implement LLM call
+  - [ ] Test end-to-end
+
+### Phase 4: Intent Detection & Planning (Days 6-7)
+- [ ] **Intent Detector**
+  - [ ] Prompt engineering
+  - [ ] LLM integration
+  - [ ] Plan parsing
+
+- [ ] **Pipeline Executor**
+  - [ ] Sequential execution
+  - [ ] Context passing
+  - [ ] Fail-fast handling
+
+### Phase 5: Additional Tools (Days 8-10)
+- [ ] **PDF Extraction**
+- [ ] **Image Analysis**
+- [ ] **Web Search**
+
+### Phase 6: Gateway & API (Days 11-12)
+- [ ] **Gateway Controller**
+  - [ ] Multipart handling
+  - [ ] Validation
+  - [ ] Response formatting
+
+### Phase 7: Testing (Days 13-14)
+- [ ] Unit tests
+- [ ] Integration tests
+- [ ] All use cases tested
+
+### Phase 8: Documentation & Deployment (Day 15)
+- [ ] Complete README
+- [ ] API documentation
+- [ ] Deployment guide
+
+---
+
+## 9. MVP Use Cases
+
+### Use Case 1: Simple ASK
+**Input:**
+```json
+{
+  "instruction": "Co to jest fotosynteza?"
+}
+```
+**Expected Flow:** LLM → Simple ASK tool → Response
+
+### Use Case 2: PDF Data Extraction
+**Input:**
+```json
+{
+  "instruction": "Wyciągnij wszystkie kwoty z tej faktury",
+  "file": "faktura.pdf"
+}
+```
+**Expected Flow:** LLM Planning → PDF Extraction → Data Extraction → Response
+
+### Use Case 3: Image Analysis
+**Input:**
+```json
+{
+  "instruction": "Co jest na tym zdjęciu?",
+  "file": "photo.jpg"
+}
+```
+**Expected Flow:** LLM Planning → Image Analysis → Response
+
+### Use Case 4: Web Search
+**Input:**
+```json
+{
+  "instruction": "Znajdź najnowsze newsy o AI"
+}
+```
+**Expected Flow:** LLM Planning → Web Search → Summarization → Response
+
+---
+
+## 10. Key Design Patterns Used
+
+- **Factory Pattern**: LLM provider selection
+- **Strategy Pattern**: Tool selection and execution
+- **Chain of Responsibility**: Pipeline execution
+- **Plugin Architecture**: Tool registry and auto-discovery
+- **Adapter Pattern**: Unified LLM interface
+
+---
+
+## 11. Performance Considerations
+
+- **Timeout Strategy**: 60s hard limit per request
+- **Memory Management**: Files in-memory, cleaned after request
+- **Concurrency**: Fastify async for multiple concurrent requests
+- **LLM Optimization**: Single planning call
+
+---
+
+## 12. Security Checklist
+
+- [ ] Input validation
+- [ ] Sanitize user instructions
+- [ ] Environment variable protection
+- [ ] CORS configuration
+- [ ] API key rotation strategy
+
+---
+
+**Document Version:** 1.0  
+**Last Updated:** 2025-10-01  
+**Status:** Ready for Implementation
+```
+
+
+

@@ -1,0 +1,18 @@
+{
+  "name": "meal-plan-generator",
+  "version": "1.0.0",
+  "description": "Generate personalized meal plans based on dietary requirements with Polish cuisine support",
+  "capabilities": ["diet-planning", "meal-generation", "calorie-management", "dietary-restrictions", "polish-cuisine", "weekly-planning"],
+  "inputTypes": ["text/plain", "structured-data"],
+  "outputType": "meal-plan",
+  "estimatedDurationMs": 15000,
+  "priority": 85,
+  "contentType": {
+    "contentType": "meal-plan/weekly-v1",
+    "version": "1.0.0",
+    "category": "health",
+    "defaultDisplayType": "table",
+    "icon": "📅"
+  }
+}
+

@@ -1,0 +1,1 @@
+{"success":false,"error":"Operation 'tool:image-analysis' timed out after 12000ms","failedAtStep":0,"completedSteps":[],"metadata":{"executionTimeMs":15329,"llmModel":"CLAUDE_FAST","requestId":"req_1760389111093_kx4ltq"}}

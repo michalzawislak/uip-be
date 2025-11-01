@@ -1,0 +1,19 @@
+{
+  "name": "recipe-nutrition-calculator",
+  "version": "1.0.0",
+  "description": "Calculate nutritional values for recipes and cooking instructions with Polish unit support",
+  "capabilities": ["recipe-analysis", "nutrition-calculation", "portion-sizing", "ingredient-parsing", "polish-ingredients"],
+  "inputTypes": ["text/plain"],
+  "outputType": "nutrition-data",
+  "estimatedDurationMs": 4000,
+  "priority": 80,
+  "contentType": {
+    "contentType": "recipe/nutrition-v1",
+    "version": "1.0.0",
+    "category": "food",
+    "defaultDisplayType": "card",
+    "primaryField": "recipeName",
+    "icon": "🍳"
+  }
+}
+
